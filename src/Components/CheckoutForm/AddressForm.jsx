@@ -10,7 +10,8 @@ import {
 import { useForm, FormProvider } from "react-hook-form";
 import { commerce } from "../../lib/commerce";
 import CustomTextField from "./CustomTextField";
-const AddressForm = ({ checkoutToken }) => {
+import { Link } from "react-router-dom";
+const AddressForm = ({ checkoutToken, next }) => {
   const [shippingCountries, setShippingCountries] = useState([]);
   const [shippingCountry, setShippingCountry] = useState("");
 
@@ -21,11 +22,16 @@ const AddressForm = ({ checkoutToken }) => {
   const [shippingOption, setShippingOption] = useState("");
 
   const methods = useForm();
-
+  console.log(shippingOptions);
   const countries = Object.entries(shippingCountries).map(([code, name]) => ({
     id: code,
     label: name,
   }));
+  const options = shippingOptions.map((sO) => ({
+    id: sO.id,
+    label: `${sO.description} - (${sO.price.formatted_with_symbol})`,
+  }));
+  console.log(shippingOptions);
   const subDivisions = Object.entries(
     shippingSubdivisions
   ).map(([code, name]) => ({ id: code, label: name }));
@@ -51,14 +57,14 @@ const AddressForm = ({ checkoutToken }) => {
   const fetchShippingOptions = async (
     checkoutTokenId,
     country,
-    region = null
+    stateProvince = null
   ) => {
     const options = await commerce.checkout.getShippingOptions(
       checkoutTokenId,
-      { country, region }
+      { country, region: stateProvince }
     );
     setShippingOptions(options);
-    setShippingOption(options[0].id);
+    setShippingOption(options[0]?.id);
   };
   useEffect(() => {
     fetchShippingCountries(checkoutToken.id);
@@ -67,20 +73,38 @@ const AddressForm = ({ checkoutToken }) => {
   useEffect(() => {
     if (shippingCountry) fetchSubDivisions(shippingCountry);
   }, [shippingCountry]);
+
+  useEffect(() => {
+    if (shippingSubdivision)
+      fetchShippingOptions(
+        checkoutToken.id,
+        shippingCountry,
+        shippingSubdivision
+      );
+  }, [shippingSubdivision]);
   return (
     <>
       <Typography variant="h6" gutterBottom>
         Shipping Address
       </Typography>
       <FormProvider {...methods}>
-        <form onSubmit="">
+        <form
+          onSubmit={methods.handleSubmit((data) =>
+            next({
+              ...data,
+              shippingCountry,
+              shippingSubdivision,
+              shippingOption,
+            })
+          )}
+        >
           <Grid container spacing={3}>
-            <CustomTextField required name="firstName" label="First name" />
-            <CustomTextField required name="lastName" label="Last name" />
-            <CustomTextField required name="address" label="Address" />
-            <CustomTextField required name="email" label="Email" />
-            <CustomTextField required name="city" label="City" />
-            <CustomTextField required name="zip" label="ZIP / Postal code" />
+            <CustomTextField name="firstName" label="First name" />
+            <CustomTextField name="lastName" label="Last name" />
+            <CustomTextField name="address" label="Address" />
+            <CustomTextField name="email" label="Email" />
+            <CustomTextField name="city" label="City" />
+            <CustomTextField name="zip" label="ZIP / Postal code" />
             <Grid item xs={12} sm={6}>
               <InputLabel>Shipping Country</InputLabel>
               <Select
@@ -111,13 +135,28 @@ const AddressForm = ({ checkoutToken }) => {
             </Grid>
             <Grid item xs={12} sm={6}>
               <InputLabel>Shipping Options</InputLabel>
-              <Select value="" fullWidth onChange="">
-                <MenuItem key="" value="">
-                  Select Me
-                </MenuItem>
+              <Select
+                value={shippingOption}
+                fullWidth
+                onChange={(e) => setShippingOption(e.target.value)}
+              >
+                {options.map((option) => (
+                  <MenuItem key={option.id} value={option.id}>
+                    {option.label}
+                  </MenuItem>
+                ))}
               </Select>
             </Grid>
           </Grid>
+          <br />
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Button component={Link} to="/cart" variant="outlines">
+              Back to Cart
+            </Button>
+            <Button variant="contained" type="submit" color="primary">
+              Next
+            </Button>
+          </div>
         </form>
       </FormProvider>
     </>
